@@ -7,13 +7,12 @@ Interceptor.attach(addCoin, {
         console.log(`\n[*] AddCoin() is called, class instance is ${args[0]}`);
     },
     onLeave: function(ret) {
-        console.log(`[*] TotalCoins are stored at class instace + 0x310`);
+        console.log(`[*] TotalCoins are stored at class instance + 0x310`);
         console.log(hexdump(ptr(this.instance).add(0x310), {length: 16}));
     }
 })
 
 let unsetWatchPoint = false;
-let removeWatchPoint = false;
 let _addr, _size, _conditions;
 let threads = null;
 function installWatchpoint(addr, size, conditions) {
