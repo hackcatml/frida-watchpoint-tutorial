@@ -5,9 +5,13 @@ I will explore how to use this feature through a sample Unreal Engine v4.27.2 ga
 Readers can download it from the [release](https://github.com/hackcatml/frida-watchpoint-tutorial/releases/tag/v1.0.0) section.<br>
 Since I made the Unreal game myself and already know the logic, I will skip the SDK dump and analysis. I recommend that readers try dumping and analyzing the game logic themselves.
 
+To save the readers' time, I recommend reading the final section and then immediately attaching the script to test it.<br>
+The first three sections are more like trial and error before writing the final section.
+
 - [Android Unreal Engine Tutorial](#android-unreal-engine-tutorial)
 - [What about iOS?](#what-about-ios)
 - [Finding a thread](#finding-a-thread)
+- [Are you sure you really can't set the watchpoint on all threads?](#are-you-sure-you-really-cant-set-the-watchpoint-on-all-threads)
 
 ## Android Unreal Engine Tutorial
 
@@ -243,6 +247,70 @@ var int = setInterval(() => {
     }
 }, 0);
 ```
+
+## Are you sure you really cant set the watchpoint on all threads
+
+The tutorials above were written to find the correct thread for setting the watchpoint, as setting a watchpoint on all threads was thought to cause the game to freeze or crash due to overload.  
+However, could it be that the script for setting the watchpoint on all threads was poorly written, causing the game to freeze or crash?  
+Let's take a closer look at that script.
+```javascript
+function installWatchpoint(addr, size, conditions) {
+    _addr = addr;
+    _size = size;
+    _conditions = conditions;
+    threads = Process.enumerateThreads();  
+    for (const thread of threads) {
+        Process.setExceptionHandler(e => {
+          console.log(`\n[!] ${e.context.pc} tried to "${_conditions}" at ${_addr} (${thread.id} ${thread.name})`);
+          if (['breakpoint', 'single-step'].includes(e.type)) {
+            thread.unsetHardwareWatchpoint(0);
+            unsetWatchPoint = true;
+            return true;
+          }      
+          return false;
+        });   
+        thread.setHardwareWatchpoint(0, addr, size, conditions);
+        console.log(`[*] HardwareWatchpoint set at ${addr} (${thread.id} ${thread.name})`);
+    }
+}
+```
+
+Oh no... putting `Process.setExceptionHandler` inside the for loop...  
+The thread where the breakpoint exception occurred is not being properly unset.  
+After modifying the script as follows and running the game, it turned out that setting the watchpoint on all threads did not cause the game to freeze or crash.
+```javascript
+function installWatchpoint(addr, size, conditions) {
+    _addr = addr;
+    _size = size;
+    _conditions = conditions;
+    threads = Process.enumerateThreads();
+    Process.setExceptionHandler(e => {
+        console.log(`\n[!] ${e.context.pc} tried to "${_conditions}" at ${_addr}`);
+        if (['breakpoint', 'single-step'].includes(e.type)) {
+            for (const thread of threads) {
+                if (thread.id === Process.getCurrentThreadId()) {
+                    thread.unsetHardwareWatchpoint(0);
+                    unsetWatchPoint = true;
+                    return true;
+                }
+            }
+        }      
+        return false;
+    });  
+    for (const thread of threads) {
+        try {
+            thread.setHardwareWatchpoint(0, addr, size, conditions);
+            console.log(`[*] HardwareWatchpoint set at ${addr} (${thread.id} ${thread.name})`);
+        } catch (error) {}
+    }
+}
+```
+
+Try attaching the script to the game and testing it.
+```
+frida -UF -l script_set_watchpoint_all_threads.js
+```
+![image](https://github.com/user-attachments/assets/548f6ab3-e58c-444c-899f-4ccecc28f986)
 
 
 ## Contact
