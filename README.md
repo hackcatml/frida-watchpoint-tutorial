@@ -138,7 +138,6 @@ Interceptor.attach(addCoin, {
 })
 
 let unsetWatchPoint = false;
-let removeWatchPoint = false;
 let _addr, _size, _conditions;
 let threads = null;
 function installWatchpoint(addr, size, conditions) {
@@ -203,7 +202,6 @@ Interceptor.attach(_Zeq12FNameEntryId5EName, {
 })
 
 let unsetWatchPoint = false;
-let removeWatchPoint = false;
 let _addr, _size, _conditions;
 let threads = null;
 function installWatchpoint(addr, size, conditions) {
