@@ -7,6 +7,7 @@ Since I made the Unreal game myself and already know the logic, I will skip the 
 
 - [Android Unreal Engine Tutorial](#android-unreal-engine-tutorial)
 - [What about iOS?](#what-about-ios)
+- [Finding a thread](#finding-a-thread)
 
 ## Android Unreal Engine Tutorial
 
@@ -105,6 +106,146 @@ Perhaps the best method is to set the watchpoint on each thread one by one and c
 Since no meaningful thread names are visible, could it be one of the undefined threads?  
 Bingo!  
 ![image](https://github.com/user-attachments/assets/56e2d347-bf78-4d94-894a-b45090a2afb4)
+
+## Finding a thread
+
+Readers who have read up to this point may have some questions.  
+"Aha, so I just need to find the right thread and set the watchpoint! But what if there are more than 100 threads? In that case, do I need to check each one manually?"
+
+Indeed, setting a watchpoint on each thread one by one to check is impractical.  
+Upon reflection, the memory write operation I’m interested in is likely being performed by a game function.  
+So, if I hook a game function and get the thread ID when that function is called, that thread is probably the game thread.
+
+I know for sure that the `AddCoin` function is called each time a coin is obtained in the EndlessRunner game.  
+Based on this, let's rewrite the script.
+
+```javascript
+const base = Module.findBaseAddress('libUE4.so');
+const addCoin = base.add(0x69a4450);
+let targetThread = null;
+
+Interceptor.attach(addCoin, {
+    onEnter: function(args) {
+        this.instance = args[0];
+        console.log(`\n[*] AddCoin() is called, class instance is ${args[0]}`);
+        targetThread = Process.enumerateThreads().filter(t => t.id === Process.getCurrentThreadId())[0];
+        console.log(`\n[*] target thread found: ${targetThread.id} ${targetThread.name}`);
+    },
+    onLeave: function(ret) {
+        console.log(`[*] TotalCoins are stored at class instance + 0x310`);
+        console.log(hexdump(ptr(this.instance).add(0x310), {length: 16}));
+    }
+})
+
+let unsetWatchPoint = false;
+let removeWatchPoint = false;
+let _addr, _size, _conditions;
+let threads = null;
+function installWatchpoint(addr, size, conditions) {
+    if (targetThread === null) {
+        console.log(`\n[!] Need to find a target thread first`);
+        return;
+    }
+
+    _addr = addr;
+    _size = size;
+    _conditions = conditions;
+    threads = [];
+    threads.push(targetThread);
+    for (const thread of threads) {
+        Process.setExceptionHandler(e => {
+          console.log(`\n[!] ${e.context.pc} tried to "${_conditions}" at ${_addr}`);
+          if (['breakpoint', 'single-step'].includes(e.type)) {
+            thread.unsetHardwareWatchpoint(0);
+            unsetWatchPoint = true;
+            return true;
+          }      
+          return false;
+        });   
+        thread.setHardwareWatchpoint(0, addr, size, conditions);
+        console.log(`[*] HardwareWatchpoint set at ${addr} (${thread.id} ${thread.name})`);
+    }
+}
+
+function reInstallWatchPoint() {
+    for (const thread of threads) {
+        thread.setHardwareWatchpoint(0, _addr, _size, _conditions);
+    }
+}
+
+var int = setInterval(() => {
+    if (unsetWatchPoint) {
+        reInstallWatchPoint();
+        unsetWatchPoint = false;
+    }
+}, 0);
+```
+
+Here are the results:
+![image](https://github.com/user-attachments/assets/93378467-27f3-4fbc-9590-f10cdc5201ae)
+
+But what if you don’t know which game function is being called at all?  
+In that case, you need to find a commonly called game function within the game.  
+In Unreal Engine games, a function called `operator==(FNameEntryId, EName)` is called repeatedly within the game.  
+This function is used to find the `GName` object. If you're curious, you can refer to [frida-ue4dump wiki](https://github.com/hackcatml/frida-ue4dump/wiki#how-to-find-gname-offset-manually).
+
+Here’s the script for that case:
+```javascript
+let targetThread = null;
+const _Zeq12FNameEntryId5EName = Module.findExportByName('libUE4.so', "_Zeq12FNameEntryId5EName");
+
+Interceptor.attach(_Zeq12FNameEntryId5EName, {
+    onEnter: function(args) {
+        targetThread = Process.enumerateThreads().filter(t => t.id === Process.getCurrentThreadId())[0];
+        console.log(`\n[*] target thread found: ${targetThread.id} ${targetThread.name}`);
+        Interceptor.detachAll();
+    },
+})
+
+let unsetWatchPoint = false;
+let removeWatchPoint = false;
+let _addr, _size, _conditions;
+let threads = null;
+function installWatchpoint(addr, size, conditions) {
+    if (targetThread === null) {
+        console.log(`\n[!] Need to find a target thread first`);
+        return;
+    }
+
+    _addr = addr;
+    _size = size;
+    _conditions = conditions;
+    threads = [];
+    threads.push(targetThread);
+    for (const thread of threads) {
+        Process.setExceptionHandler(e => {
+          console.log(`\n[!] ${e.context.pc} tried to "${_conditions}" at ${_addr}`);
+          if (['breakpoint', 'single-step'].includes(e.type)) {
+            thread.unsetHardwareWatchpoint(0);
+            unsetWatchPoint = true;
+            return true;
+          }      
+          return false;
+        });   
+        thread.setHardwareWatchpoint(0, addr, size, conditions);
+        console.log(`[*] HardwareWatchpoint set at ${addr} (${thread.id} ${thread.name})`);
+    }
+}
+
+function reInstallWatchPoint() {
+    for (const thread of threads) {
+        thread.setHardwareWatchpoint(0, _addr, _size, _conditions);
+    }
+}
+
+var int = setInterval(() => {
+    if (unsetWatchPoint) {
+        reInstallWatchPoint();
+        unsetWatchPoint = false;
+    }
+}, 0);
+```
+
 
 ## Contact
 - Channel: https://t.me/hackcatml1  
