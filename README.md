@@ -1,7 +1,7 @@
 # frida-watchpoint-tutorial
 A great feature called [setHardwareWatchpoint](https://frida.re/news/2024/09/06/frida-16-5-0-released/) was introduced in Frida version 16.5.0. This makes it easy to determine where memory is being read from or written to.
 
-I will explore how to use this feature through a sample Android Unreal Engine v4.27.2 game.<br>
+I will explore how to use this feature through a sample Unreal Engine v4.27.2 game.<br>
 Readers can download it from the [release](https://github.com/hackcatml/frida-watchpoint-tutorial/releases/tag/v1.0.0) section.<br>
 Since I made the Unreal game myself and already know the logic, I will skip the SDK dump and analysis. I recommend that readers try dumping and analyzing the game logic themselves.
 
