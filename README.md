@@ -1,10 +1,14 @@
 # frida-watchpoint-tutorial
-
 A great feature called [setHardwareWatchpoint](https://frida.re/news/2024/09/06/frida-16-5-0-released/) was introduced in Frida version 16.5.0. This makes it easy to determine where memory is being read from or written to.
 
 I will explore how to use this feature through a sample Android Unreal Engine v4.27.2 game.<br>
 Readers can download it from the [release](https://github.com/hackcatml/frida-watchpoint-tutorial/releases/tag/v1.0.0) section.<br>
 Since I made the Unreal game myself and already know the logic, I will skip the SDK dump and analysis. I recommend that readers try dumping and analyzing the game logic themselves.
+
+- [Android Unreal Engine Tutorial](#android-unreal-engine-tutorial)
+- [What about iOS?](#what-about-ios)
+
+## Android Unreal Engine Tutorial
 
 EndlessRunner is a game where you collect coins while running.  
 Let’s run the game and attach a Frida script.
@@ -83,6 +87,25 @@ Now, let’s hook at 0x751ae5a47c and add +100 to the value of the `x9` register
 Success!<br>
 ![screencapture-1728607249785](https://github.com/user-attachments/assets/b86e55a6-1122-408c-b7b1-2c3f6ee30cbe)
 
-# Contact
+## What about iOS?
+
+The method is the same for Android.  
+However, finding the thread to set the watchpoint on is a bit more troublesome compared to Android.  
+This is because, when you print the thread names, no meaningful thread names are shown.  
+![image](https://github.com/user-attachments/assets/e5fb650a-afbc-4729-af34-dd8cb0385886)
+
+Also, if you set a watchpoint on all threads and observe, incorrect information is displayed.  
+In the picture below, it appears that the `com.apple.CoreMotion.MotionThread` is writing to memory.  
+![image](https://github.com/user-attachments/assets/a5755a97-adb5-4993-8c85-cb5695d9a47b)
+
+However, when you set the watchpoint only on `com.apple.CoreMotion.MotionThread` and run the game, you don't get any results.  
+![image](https://github.com/user-attachments/assets/9c87775a-c065-4b40-aa08-df6c02970360)
+
+Perhaps the best method is to set the watchpoint on each thread one by one and check.  
+Since no meaningful thread names are visible, could it be one of the undefined threads?  
+Bingo!  
+![image](https://github.com/user-attachments/assets/56e2d347-bf78-4d94-894a-b45090a2afb4)
+
+## Contact
 - Channel: https://t.me/hackcatml1  
 - Chat: https://t.me/hackcatmlchat
