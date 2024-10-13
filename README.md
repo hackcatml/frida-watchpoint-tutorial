@@ -285,8 +285,8 @@ function installWatchpoint(addr, size, conditions) {
     _conditions = conditions;
     threads = Process.enumerateThreads();
     Process.setExceptionHandler(e => {
-        console.log(`\n[!] ${e.context.pc} tried to "${_conditions}" at ${_addr}`);
         if (['breakpoint', 'single-step'].includes(e.type)) {
+            console.log(`\n[!] ${e.context.pc} tried to "${_conditions}" at ${_addr}`);
             for (const thread of threads) {
                 if (thread.id === Process.getCurrentThreadId()) {
                     thread.unsetHardwareWatchpoint(0);
